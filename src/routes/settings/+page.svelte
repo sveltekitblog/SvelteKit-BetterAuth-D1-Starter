@@ -2,10 +2,13 @@
     import { authClient } from "$lib/auth-client";
     import { onMount } from "svelte";
 
+    import { enhance } from "$app/forms";
     const session = authClient.useSession();
     let newName = "";
     let message = "";
     let isSaving = false;
+    let showDeleteModal = false;
+    let isDeleting = false;
 
     onMount(() => {
         if ($session.data) {
@@ -83,6 +86,65 @@
             </p>
         {/if}
     </div>
+
+    <!-- 위험 구역 (계정 탈퇴) -->
+    <div class="card danger-zone">
+        <h2>위험 구역</h2>
+        <p class="description">
+            계정을 탈퇴하면 모든 데이터가 영구적으로 삭제되며 복구할 수
+            없습니다.
+        </p>
+        <button class="delete-btn" on:click={() => (showDeleteModal = true)}>
+            계정 탈퇴하기
+        </button>
+    </div>
+
+    <!-- 탈퇴 확인 모달 -->
+    {#if showDeleteModal}
+        <div class="modal-overlay">
+            <div class="modal">
+                <h3>정말로 탈퇴하시겠습니까? 😢</h3>
+                <p>
+                    탈퇴 버튼을 누르면 귀하의 계정 정보와 모든 활동 내역이 즉시
+                    삭제됩니다. 이 작업은 취소할 수 없습니다.
+                </p>
+                <div class="modal-actions">
+                    <button
+                        class="cancel-btn"
+                        on:click={() => (showDeleteModal = false)}
+                        disabled={isDeleting}
+                    >
+                        취소
+                    </button>
+                    <form
+                        method="POST"
+                        action="?/deleteAccount"
+                        use:enhance={() => {
+                            isDeleting = true;
+                            return async ({ result, update }) => {
+                                isDeleting = false;
+                                showDeleteModal = false;
+                                if (result.type === "redirect") {
+                                    // 하드 리프레시를 동반한 이동으로 클라이언트 세션 정보를 완전히 초기화합니다.
+                                    window.location.href = result.location;
+                                } else {
+                                    await update();
+                                }
+                            };
+                        }}
+                    >
+                        <button
+                            type="submit"
+                            class="confirm-delete-btn"
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? "처리 중..." : "네, 탈퇴하겠습니다"}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    {/if}
 
     <div class="back-link">
         <a href="/">← 홈으로 돌아가기</a>
@@ -208,5 +270,110 @@
     .back-link a:hover {
         color: #007bff;
         text-decoration: underline;
+    }
+
+    /* 위험 구역 스타일 */
+    .danger-zone {
+        margin-top: 2rem;
+        border: 1px solid #ffcfcf;
+        background-color: #fffafb;
+    }
+
+    .danger-zone h2 {
+        font-size: 1.2rem;
+        color: #d11a2a;
+        margin-top: 0;
+        margin-bottom: 0.5rem;
+    }
+
+    .delete-btn {
+        width: 100%;
+        padding: 0.8rem;
+        background-color: transparent;
+        color: #d11a2a;
+        border: 1px solid #d11a2a;
+        border-radius: 6px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .delete-btn:hover {
+        background-color: #d11a2a;
+        color: white;
+    }
+
+    /* 모달 스타일 */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: 1rem;
+    }
+
+    .modal {
+        background: white;
+        padding: 2rem;
+        border-radius: 12px;
+        max-width: 400px;
+        width: 100%;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        text-align: center;
+    }
+
+    .modal h3 {
+        margin-top: 0;
+        color: #333;
+    }
+
+    .modal p {
+        color: #666;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        margin-bottom: 2rem;
+    }
+
+    .modal-actions {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: center;
+    }
+
+    .cancel-btn,
+    .confirm-delete-btn {
+        padding: 0.7rem 1.2rem;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 0.95rem;
+    }
+
+    .cancel-btn {
+        background: #f3f4f6;
+        border: 1px solid #ddd;
+        color: #4b5563;
+    }
+
+    .confirm-delete-btn {
+        background: #d11a2a;
+        color: white;
+        border: none;
+    }
+
+    .confirm-delete-btn:hover:not(:disabled) {
+        background-color: #b01623;
+    }
+
+    .confirm-delete-btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
     }
 </style>
